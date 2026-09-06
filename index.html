@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Game Thư Giãn Đồng Cỏ Bình Minh</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #111;
+        }
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* UI Auth Overlay */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            width: 320px;
+            text-align: center;
+        }
+        .card h2 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        .card input {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            outline: none;
+        }
+        .card button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 8px;
+            background: #27ae60;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .card button:hover {
+            background: #219150;
+        }
+        .switch-btn {
+            margin-top: 12px;
+            font-size: 13px;
+            color: #2980b9;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        /* Menu Chọn Vũ Khí */
+        #weaponMenu {
+            display: none;
+        }
+        .weapon-options {
+            display: flex;
+            justify-content: space-around;
+            margin: 15px 0;
+        }
+        .weapon-card {
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            padding: 10px;
+            width: 110px;
+            cursor: pointer;
+            background: #f9f9f9;
+            transition: 0.2s;
+        }
+        .weapon-card.selected {
+            border-color: #27ae60;
+            background: #e8f8f5;
+        }
+        .weapon-card img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+
+        /* HUD In Game */
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            pointer-events: none;
+            display: none;
+            z-index: 10;
+        }
+
+        /* Joystick & Attack Button */
+        #joystickContainer {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            touch-action: none;
+            display: none;
+            z-index: 10;
+        }
+        #joystickKnob {
+            position: absolute;
+            top: 35px;
+            left: 35px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+        }
+        #attackBtn {
+            position: absolute;
+            bottom: 40px;
+            right: 40px;
+            width: 80px;
+            height: 80px;
+            background: rgba(231, 76, 60, 0.7);
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        #attackBtn:active {
+            transform: scale(0.95);
+            background: rgba(192, 57, 43, 0.9);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="authMenu" class="overlay">
+        <div class="card">
+            <h2 id="authTitle">Đăng Nhập</h2>
+            <input type="text" id="username" placeholder="Tên tài khoản">
+            <input type="password" id="password" placeholder="Mật khẩu">
+            <button id="authBtn" onclick="handleAuth()">Đăng Nhập</button>
+            <div class="switch-btn" id="switchBtn" onclick="toggleAuthMode()">Chưa có tài khoản? Đăng ký ngay</div>
+        </div>
+    </div>
+
+    <div id="weaponMenu" class="overlay">
+        <div class="card" style="width: 350px;">
+            <h2>Chọn Món Đồ Đánh</h2>
+            <p style="font-size: 13px; color: #666;">Hãy chọn vũ khí đồng hành cùng bạn</p>
+            <div class="weapon-options">
+                <div class="weapon-card selected" id="weap1" onclick="selectWeapon(1)">
+                    <img id="imgPreview1" src="IMG_0505.png" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'50\' height=\'50\'><rect width=\'50\' height=\'50\' fill=\'%23e74c3c\'/><text x=\'50%\' y=\'50%\' fill=\'white\' dominant-baseline=\'middle\' text-anchor=\'middle\'>Đồ 1</text></svg>'" alt="IMG_0505">
+                    <div>Món 1</div>
+                </div>
+                <div class="weapon-card" id="weap2" onclick="selectWeapon(2)">
+                    <img id="imgPreview2" src="IMG_0506.jpeg" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'50\' height=\'50\'><rect width=\'50\' height=\'50\' fill=\'%238e44ad\'/><text x=\'50%\' y=\'50%\' fill=\'white\' dominant-baseline=\'middle\' text-anchor=\'middle\'>Đồ 2</text></svg>'" alt="IMG_0506">
+                    <div>Món 2</div>
+                </div>
+            </div>
+            <button onclick="startGame()">Vào Game Thư Giãn</button>
+        </div>
+    </div>
+
+    <div id="hud">
+        Người chơi: <span id="hudUser">---</span> | Điểm: <span id="hudScore">0</span>
+    </div>
+
+    <div id="joystickContainer">
+        <div id="joystickKnob"></div>
+    </div>
+    <div id="attackBtn" onclick="performAttack()">ĐÁNH</div>
+
+    <audio id="bgMusic" loop preload="auto">
+        <source src="snapvideo--On Top - the girl next door | Live Wallpaper 0.9x  #music #chillmusic #livewallpaper #chill -9182910.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Tải Ảnh
+        const images = {
+            player: new Image(),
+            pole: new Image(),
+            block: new Image(),
+            weapon1: new Image(),
+            weapon2: new Image()
+        };
+
+        images.player.src = 'IMG_0498.jpeg';
+        images.pole.src = 'IMG_0502.png';
+        images.block.src = 'Roblox VN.png';
+        images.weapon1.src = 'IMG_0505.png';
+        images.weapon2.src = 'IMG_0506.jpeg';
+
+        // Đánh dấu ảnh load lỗi để render hình khối thay thế
+        const imgLoaded = { player: false, pole: false, block: false, weapon1: false, weapon2: false };
+        images.player.onload = () => imgLoaded.player = true;
+        images.pole.onload = () => imgLoaded.pole = true;
+        images.block.onload = () => imgLoaded.block = true;
+        images.weapon1.onload = () => imgLoaded.weapon1 = true;
+        images.weapon2.onload = () => imgLoaded.weapon2 = true;
+
+        // Biến Game State & Tài khoản
+        let isAuthModeLogin = true;
+        let currentUser = null;
+        let selectedWeaponId = 1;
+        let score = 0;
+        let gameRunning = false;
+
+        // Quản lý Đăng nhập / Đăng ký qua LocalStorage
+        function toggleAuthMode() {
+            isAuthModeLogin = !isAuthModeLogin;
+            document.getElementById('authTitle').innerText = isAuthModeLogin ? "Đăng Nhập" : "Đăng Ký";
+            document.getElementById('authBtn').innerText = isAuthModeLogin ? "Đăng Nhập" : "Đăng Ký";
+            document.getElementById('switchBtn').innerText = isAuthModeLogin ? "Chưa có tài khoản? Đăng ký ngay" : "Đã có tài khoản? Đăng nhập";
+        }
+
+        function handleAuth() {
+            const userIn = document.getElementById('username').value.trim();
+            const passIn = document.getElementById('password').value.trim();
+
+            if (!userIn || !passIn) {
+                alert("Vui lòng nhập đầy đủ tên tài khoản và mật khẩu!");
+                return;
+            }
+
+            let users = JSON.parse(localStorage.getItem('chill_game_users') || '{}');
+
+            if (isAuthModeLogin) {
+                if (users[userIn] && users[userIn].password === passIn) {
+                    currentUser = userIn;
+                    score = users[userIn].score || 0;
+                    showWeaponMenu();
+                } else {
+                    alert("Sai tài khoản hoặc mật khẩu!");
+                }
+            } else {
+                if (users[userIn]) {
+                    alert("Tài khoản đã tồn tại!");
+                } else {
+                    users[userIn] = { password: passIn, score: 0 };
+                    localStorage.setItem('chill_game_users', JSON.stringify(users));
+                    currentUser = userIn;
+                    score = 0;
+                    alert("Đăng ký thành công!");
+                    showWeaponMenu();
+                }
+            }
+        }
+
+        function saveScore() {
+            if (!currentUser) return;
+            let users = JSON.parse(localStorage.getItem('chill_game_users') || '{}');
+            if (users[currentUser]) {
+                users[currentUser].score = score;
+                localStorage.setItem('chill_game_users', JSON.stringify(users));
+            }
+        }
+
+        function showWeaponMenu() {
+            document.getElementById('authMenu').style.display = 'none';
+            document.getElementById('weaponMenu').style.display = 'flex';
+        }
+
+        function selectWeapon(id) {
+            selectedWeaponId = id;
+            document.getElementById('weap1').classList.toggle('selected', id === 1);
+            document.getElementById('weap2').classList.toggle('selected', id === 2);
+        }
+
+        function startGame() {
+            document.getElementById('weaponMenu').style.display = 'none';
+            document.getElementById('hud').style.display = 'block';
+            document.getElementById('joystickContainer').style.display = 'block';
+            document.getElementById('attackBtn').style.display = 'flex';
+            
+            document.getElementById('hudUser').innerText = currentUser;
+            document.getElementById('hudScore').innerText = score;
+
+            // Bật nhạc nền
+            const music = document.getElementById('bgMusic');
+            music.play().catch(e => console.log("Cần tương tác để phát nhạc"));
+
+            resizeCanvas();
+            gameRunning = true;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Cấu hình Thế Giới Game 2D
+        const world = {
+            width: 2500,
+            height: 600,
+            groundY: 480
+        };
+
+        const camera = { x: 0, y: 0 };
+
+        const player = {
+            x: 100,
+            y: world.groundY - 60,
+            width: 60,
+            height: 60,
+            vx: 0,
+            vy: 0,
+            speed: 4,
+            facingRight: true,
+            isAttacking: false,
+            attackTimer: 0
+        };
+
+        // Cột và Khối treo ở cuối bản đồ
+        const targetPole = {
+            x: 2100,
+            y: world.groundY - 250,
+            width: 40,
+            height: 250,
+            block: {
+                x: 2060,
+                y: world.groundY - 310,
+                width: 120,
+                height: 70
+            }
+        };
+
+        // Xử lý Cần Điều Khiển (Joystick)
+        const joystick = {
+            active: false,
+            startX: 0,
+            startY: 0,
+            currX: 0,
+            currY: 0,
+            dirX: 0,
+            dirY: 0
+        };
+
+        const jsContainer = document.getElementById('joystickContainer');
+        const jsKnob = document.getElementById('joystickKnob');
+
+        jsContainer.addEventListener('touchstart', (e) => {
+            joystick.active = true;
+            const touch = e.touches[0];
+            const rect = jsContainer.getBoundingClientRect();
+            joystick.startX = rect.left + rect.width / 2;
+            joystick.startY = rect.top + rect.height / 2;
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!joystick.active) return;
+            const touch = e.touches[0];
+            let dx = touch.clientX - joystick.startX;
+            let dy = touch.clientY - joystick.startY;
+            let dist = Math.hypot(dx, dy);
+            let maxDist = 40;
+
+            if (dist > maxDist) {
+                dx = (dx / dist) * maxDist;
+                dy = (dy / dist) * maxDist;
+            }
+
+            jsKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            joystick.dirX = dx / maxDist;
+            joystick.dirY = dy / maxDist;
+        });
+
+        const resetJoystick = () => {
+            joystick.active = false;
+            joystick.dirX = 0;
+            joystick.dirY = 0;
+            jsKnob.style.transform = `translate(0px, 0px)`;
+        };
+
+        window.addEventListener('touchend', resetJoystick);
+        window.addEventListener('touchcancel', resetJoystick);
+
+        // Hỗ trợ Phím bấm máy tính (WASD / Phím mũi tên / Space)
+        const keys = {};
+        window.addEventListener('keydown', e => {
+            keys[e.key] = true;
+            if (e.key === ' ' || e.key === 'Enter') performAttack();
+        });
+        window.addEventListener('keyup', e => keys[e.key] = false);
+
+        // Thực hiện đòn đánh
+        function performAttack() {
+            if (!player.isAttacking) {
+                player.isAttacking = true;
+                player.attackTimer = 15; // Thời gian vung đòn (frames)
+
+                // Kiểm tra va chạm với khối treo
+                const weapRange = 100;
+                let attackX = player.facingRight ? player.x + player.width : player.x - weapRange;
+                let attackRect = { x: attackX, y: player.y, width: weapRange, height: player.height };
+
+                let b = targetPole.block;
+                if (
+                    attackRect.x < b.x + b.width &&
+                    attackRect.x + attackRect.width > b.x &&
+                    attackRect.y < b.y + b.height &&
+                    attackRect.y + attackRect.height > b.y
+                ) {
+                    score += 10;
+                    document.getElementById('hudScore').innerText = score;
+                    saveScore();
+                }
+            }
+        }
+
+        // Resize Canvas
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Cập nhật trạng thái
+        function update() {
+            // Tính toán di chuyển từ Joystick hoặc Phím
+            let moveX = joystick.dirX;
+            let moveY = joystick.dirY;
+
+            if (keys['ArrowLeft'] || keys['a']) moveX = -1;
+            if (keys['ArrowRight'] || keys['d']) moveX = 1;
+            if (keys['ArrowUp'] || keys['w']) moveY = -1;
+            if (keys['ArrowDown'] || keys['s']) moveY = 1;
+
+            if (moveX !== 0) {
+                player.vx = moveX * player.speed;
+                player.facingRight = moveX > 0;
+            } else {
+                player.vx = 0;
+            }
+
+            if (moveY !== 0) {
+                player.vy = moveY * player.speed;
+            } else {
+                player.vy = 0;
+            }
+
+            // Cập nhật vị trí người chơi
+            player.x += player.vx;
+            player.y += player.vy;
+
+            // Giới hạn di chuyển trong thế giới game
+            player.x = Math.max(0, Math.min(world.width - player.width, player.x));
+            player.y = Math.max(100, Math.min(world.groundY - player.height, player.y));
+
+            // Cập nhật đòn đánh
+            if (player.isAttacking) {
+                player.attackTimer--;
+                if (player.attackTimer <= 0) {
+                    player.isAttacking = false;
+                }
+            }
+
+            // Cập nhật Camera đi theo Nhân vật
+            camera.x = player.x - canvas.width / 2 + player.width / 2;
+            camera.x = Math.max(0, Math.min(world.width - canvas.width, camera.x));
+            camera.y = 0; 
+        }
+
+        // Render Đồ Họa Bình Minh Đồng Cỏ
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            // 1. Bầu trời Bình Minh (Gradient)
+            let skyGrad = ctx.createLinearGradient(0, 0, 0, world.groundY);
+            skyGrad.addColorStop(0, '#f39c12'); // Cam ấm áp
+            skyGrad.addColorStop(0.5, '#f1c40f'); // Vàng bình minh
+            skyGrad.addColorStop(1, '#e8f8f5'); // Sương sớm nhẹ
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(camera.x, 0, canvas.width, canvas.height);
+
+            // Mặt trời mọc
+            ctx.fillStyle = 'rgba(255, 235, 150, 0.8)';
+            ctx.beginPath();
+            ctx.arc(600, 220, 90, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. Những ngọn đồi phía xa (Parallax Effect)
+            ctx.fillStyle = '#a3e4d7';
+            ctx.beginPath();
+            ctx.ellipse(300 - camera.x * 0.2, world.groundY, 400, 150, 0, 0, Math.PI * 2);
+            ctx.ellipse(1200 - camera.x * 0.2, world.groundY, 600, 200, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 3. Đồng cỏ (Ground)
+            let grassGrad = ctx.createLinearGradient(0, world.groundY, 0, canvas.height);
+            grassGrad.addColorStop(0, '#2ecc71');
+            grassGrad.addColorStop(1, '#27ae60');
+            ctx.fillStyle = grassGrad;
+            ctx.fillRect(0, world.groundY, world.width, canvas.height - world.groundY);
+
+            // Thêm chi tiết cỏ nhỏ ngẫu nhiên
+            ctx.strokeStyle = '#27ae60';
+            ctx.lineWidth = 3;
+            for (let x = 0; x < world.width; x += 40) {
+                ctx.beginPath();
+                ctx.moveTo(x, world.groundY);
+                ctx.lineTo(x - 5, world.groundY - 10);
+                ctx.moveTo(x + 10, world.groundY);
+                ctx.lineTo(x + 15, world.groundY - 12);
+                ctx.stroke();
+            }
+
+            // 4. Cột và Khối Treo ở cuối đường
+            if (imgLoaded.pole) {
+                ctx.drawImage(images.pole, targetPole.x, targetPole.y, targetPole.width, targetPole.height);
+            } else {
+                ctx.fillStyle = '#7f8c8d';
+                ctx.fillRect(targetPole.x, targetPole.y, targetPole.width, targetPole.height);
+            }
+
+            let b = targetPole.block;
+            if (imgLoaded.block) {
+                ctx.drawImage(images.block, b.x, b.y, b.width, b.height);
+            } else {
+                ctx.fillStyle = '#9b59b6';
+                ctx.fillRect(b.x, b.y, b.width, b.height);
+                ctx.fillStyle = 'white';
+                ctx.font = '12px sans-serif';
+                ctx.fillText('Roblox VN', b.x + 20, b.y + 40);
+            }
+
+            // 5. Nhân vật
+            if (imgLoaded.player) {
+                ctx.save();
+                if (!player.facingRight) {
+                    ctx.translate(player.x + player.width, player.y);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(images.player, 0, 0, player.width, player.height);
+                } else {
+                    ctx.drawImage(images.player, player.x, player.y, player.width, player.height);
+                }
+                ctx.restore();
+            } else {
+                // Khối vuông màu xanh nếu chưa có ảnh
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(player.x, player.y, player.width, player.height);
+                ctx.strokeStyle = '#2980b9';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(player.x, player.y, player.width, player.height);
+            }
+
+            // 6. Vũ khí & Hiệu ứng Đánh
+            if (player.isAttacking) {
+                ctx.save();
+                let weapImg = selectedWeaponId === 1 ? images.weapon1 : images.weapon2;
+                let isLoaded = selectedWeaponId === 1 ? imgLoaded.weapon1 : imgLoaded.weapon2;
+
+                let angle = player.facingRight ? Math.PI / 4 : -Math.PI / 4;
+                let wx = player.facingRight ? player.x + player.width : player.x;
+                let wy = player.y + player.height / 2;
+
+                ctx.translate(wx, wy);
+                ctx.rotate(angle);
+
+                if (isLoaded) {
+                    ctx.drawImage(weapImg, 0, -25, 60, 50);
+                } else {
+                    // Vũ khí mặc định nếu chưa load được ảnh
+                    ctx.fillStyle = selectedWeaponId === 1 ? '#e74c3c' : '#8e44ad';
+                    ctx.fillRect(0, -10, 50, 20);
+                }
+                ctx.restore();
+            }
+
+            ctx.restore();
+        }
+
+        // Loop chính của Game
+        function gameLoop() {
+            if (gameRunning) {
+                update();
+                render();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+    </script>
+</body>
+</html>
